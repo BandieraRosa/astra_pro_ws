@@ -161,18 +161,33 @@ def cmd_capture(args):
 
 
 def cmd_solve(args):
-    files = sorted(f for f in os.listdir(args.pairs) if f.endswith('.npz'))
+    files = sorted(f for f in os.listdir(args.pairs)
+                 if f.endswith('.npz') and f != 'd2c_result.npz')
     assert len(files) >= 10, 'need >=10 pairs, got %d' % len(files)
     k_ir, d_ir, size_ir = load_cam_info(args.ir_yaml)
     k_c, d_c, size_c = load_cam_info(args.color_yaml)
     assert size_ir == size_c, 'resolution mismatch %s vs %s' % (size_ir, size_c)
+    flip_w = None
+    if args.flip_color:
+        # color stream/yaml live in the mirrored domain: unmirror in memory
+        # (x' = W - x, cx' = W - cx, p2' = -p2) so the solve runs true-domain.
+        flip_w = float(size_c[0])
+        k_c = k_c.copy()
+        d_c = d_c.copy()
+        k_c[0, 2] = flip_w - k_c[0, 2]
+        assert d_c.size >= 4, 'need >=4 distortion coeffs, got %d' % d_c.size
+        d_c[3] = -d_c[3]
+        print('color unmirrored in memory (W=%.0f)' % flip_w, flush=True)
     objp = make_object_points(args.cols, args.rows, args.square)
     objpoints, img_ir, img_c = [], [], []
     for f in files:
         z = np.load(os.path.join(args.pairs, f))
         objpoints.append(objp)
         img_ir.append(z['ir'].reshape(-1, 1, 2))
-        img_c.append(z['color'].reshape(-1, 1, 2))
+        cc = z['color'].reshape(-1, 2).copy()
+        if flip_w is not None:
+            cc[:, 0] = flip_w - cc[:, 0]
+        img_c.append(cc.reshape(-1, 1, 2))
     print('solving from %d pairs %s ...' % (len(files), size_ir), flush=True)
     ret, _, _, _, _, R, T, E, F = cv2.stereoCalibrate(
         objpoints, img_ir, img_c, k_ir, d_ir, k_c, d_c, size_ir,
@@ -214,6 +229,8 @@ def main():
     s.add_argument('--cols', type=int, default=10)
     s.add_argument('--rows', type=int, default=7)
     s.add_argument('--square', type=float, default=0.02)
+    s.add_argument('--flip-color', action='store_true',
+                   help='color pairs/yaml are mirrored; unmirror in memory before solving')
     args = p.parse_args()
     if args.cmd == 'capture':
         cmd_capture(args)

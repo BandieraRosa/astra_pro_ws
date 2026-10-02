@@ -91,6 +91,17 @@ def generate_launch_description():
             {'camera_info_url': LaunchConfiguration('color_info_url')},
         ],
     )
+    # Unmirror the (mirrored) v4l2 color stream at the source so every
+    # consumer lives in the true domain. Publishes image_flipped +
+    # camera_info_flipped with analytically unmirrored K/D.
+    # (Plain Node: flip_node is not a registered component.)
+    flip_node = Node(
+        package='image_flip',
+        executable='flip_node',
+        name='flip_node',
+        namespace='color',
+        output='screen',
+    )
     container = ComposableNodeContainer(
         name='camera_container',
         namespace='',
@@ -118,7 +129,7 @@ def generate_launch_description():
         args
         + [
             GroupAction(
-                [PushRosNamespace(LaunchConfiguration('camera_name')), container]
+                [PushRosNamespace(LaunchConfiguration('camera_name')), container, flip_node]
             ),
             color_optical_tf,
         ]

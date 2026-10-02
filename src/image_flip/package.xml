@@ -1,18 +1,17 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>astra_pro_bringup</name>
+  <name>image_flip</name>
   <version>0.0.1</version>
-  <description>Astra Pro bringup package</description>
-  <maintainer email="3132716198@qq.com">BandieraRossa</maintainer>
+  <description>Horizontal-flip relay for mirrored camera streams (image + camera_info)</description>
+  <maintainer email="bandierarosa307@gmail.com">BandieraRossa</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <exec_depend>orbbec_camera</exec_depend>
-  <exec_depend>v4l2_camera</exec_depend>
-  <exec_depend>image_flip</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>OpenCV</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
