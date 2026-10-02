@@ -63,7 +63,7 @@ def cmd_capture(args):
 
     import rclpy
     from rclpy.node import Node
-    from rclpy.qos import SensorDataQoS
+    from rclpy.qos import qos_profile_sensor_data
     from sensor_msgs.msg import Image
     import message_filters
 
@@ -146,9 +146,9 @@ def cmd_capture(args):
     # NOTE: both inputs are best-effort (v4l2 SensorDataQoS, ir_converter
     # sensor_data default); reliable subs would never match -> silence.
     sub_ir = message_filters.Subscriber(
-        node, Image, args.ir_topic, qos_profile=SensorDataQoS())
+        node, Image, args.ir_topic, qos_profile=qos_profile_sensor_data)
     sub_c = message_filters.Subscriber(
-        node, Image, args.color_topic, qos_profile=SensorDataQoS())
+        node, Image, args.color_topic, qos_profile=qos_profile_sensor_data)
     sync = message_filters.ApproximateTimeSynchronizer([sub_ir, sub_c], 10, 0.15)
     sync.registerCallback(cb)
     print('waiting for synchronized pairs... (need >=15, aim 20-30)', flush=True)
