@@ -130,6 +130,11 @@ def cmd_capture(args):
                                            (args.cols, args.rows), c_ir, ok_ir)
         vis_c = cv2.drawChessboardCorners(color.copy(), (args.cols, args.rows), c_c, ok_c)
         vis = np.hstack([cv2.resize(vis_ir, (640, 480)), cv2.resize(vis_c, (640, 480))])
+        cv2.putText(vis, 'ir:%s color:%s saved:%d%s' % (
+            'OK' if ok_ir else '--', 'OK' if ok_c else '--', idx,
+            ' AUTO/%ss' % args.auto if args.auto > 0 else ' MANUAL'),
+            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        cv2.imshow('ir | color  (SPACE=save, Q=quit)', vis)
         key = cv2.waitKey(30) & 0xFF
         if key in (ord('q'), 27):
             print('captured %d pairs in %s' % (idx, args.out), flush=True)
