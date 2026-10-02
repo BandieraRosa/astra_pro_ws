@@ -40,7 +40,6 @@ private:
   double square_, auto_interval_;
   size_t saved_ = 0;
   double last_save_t_ = 0.0;
-  double last_debug_t_ = 0.0;
   std::vector<cv::Point2f> prev_ir_, prev_color_;
   message_filters::Subscriber<Image> sub_ir_, sub_color_;
   std::shared_ptr<Sync> sync_;

@@ -54,6 +54,8 @@ def generate_launch_description():
     )
 
     # mono16 -> mono8 for the calibrator (normalize: brighter, better contrast)
+    # intra-process: same-container edge ir_converter -> d2c_capture avoids
+    # DDS serialization (both sides already SensorDataQoS-compatible).
     converter = ComposableNode(
         package='ir_converter',
         plugin='ir_converter::IrY10Converter',
@@ -63,6 +65,7 @@ def generate_launch_description():
             'output_topic': LaunchConfiguration('ir_topic'),
             'mode': LaunchConfiguration('mode'),
         }],
+        extra_arguments=[{'use_intra_process_comms': True}],
     )
 
     capture = ComposableNode(
@@ -78,6 +81,7 @@ def generate_launch_description():
             'rows': LaunchConfiguration('rows'),
             'square': LaunchConfiguration('square'),
         }],
+        extra_arguments=[{'use_intra_process_comms': True}],
     )
 
     container = ComposableNodeContainer(

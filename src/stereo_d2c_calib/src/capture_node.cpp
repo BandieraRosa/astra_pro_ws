@@ -77,7 +77,9 @@ D2CCapture::D2CCapture(const rclcpp::NodeOptions &options) : Node("d2c_capture",
   // sensor_data default); reliable subs would never match -> silence.
   sub_ir_.subscribe(this, ir_topic_, rmw_qos_profile_sensor_data);
   sub_color_.subscribe(this, color_topic_, rmw_qos_profile_sensor_data);
-  sync_ = std::make_shared<Sync>(SyncPolicy(10), sub_ir_, sub_color_);
+  // Small queue: with ~30 Hz inputs and a heavy per-pair callback,
+  // a deep queue only serves stale pairs (visible lag in debug views).
+  sync_ = std::make_shared<Sync>(SyncPolicy(4), sub_ir_, sub_color_);
   sync_->registerCallback(&D2CCapture::callback, this);
   RCLCPP_INFO(get_logger(), "auto-capturing synchronized pairs in %s every %.1f s (Ctrl-C to stop)",
               out_dir_.c_str(), auto_interval_);
@@ -144,13 +146,8 @@ void D2CCapture::callback(const Image::ConstSharedPtr &ir_msg,
   std::vector<cv::Point2f> c_ir, c_color;
   const bool ok_ir = findBoard(ir_gray, cols_, rows_, c_ir);
   const bool ok_color = findBoard(color_gray, cols_, rows_, c_color);
-  // Debug views are throttled: detection runs full-rate for capture,
-  // visualization does not need 30 Hz (and would backlog the pubs).
-  const double now_dbg = this->now().seconds();
-  if (now_dbg - last_debug_t_ >= 0.2) {
-    last_debug_t_ = now_dbg;
-    publishSide(debug_ir_pub_, toBgrDisplay(ir_gray), c_ir, ok_ir, "ir", saved_,
-                ir_msg->header);
+  publishSide(debug_ir_pub_, toBgrDisplay(ir_gray), c_ir, ok_ir, "ir", saved_,
+              ir_msg->header);
     // color_msg may be rgb8: rebuild a BGR display copy for drawing
     cv::Mat color_bgr;
     if (color_msg->encoding == "rgb8") {
@@ -162,7 +159,6 @@ void D2CCapture::callback(const Image::ConstSharedPtr &ir_msg,
     }
     publishSide(debug_color_pub_, color_bgr, c_color, ok_color, "color", saved_,
                 color_msg->header);
-  }
 
   char status[128];
   snprintf(status, sizeof(status), "ir:%s color:%s saved:%zu AUTO/%.1fs (Ctrl-C to stop)",
