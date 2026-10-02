@@ -70,3 +70,4 @@
     pixel_format: "YUYV"
     output_encoding: "rgb8"
     image_size: [640, 480]
+    camera_info_url: ""

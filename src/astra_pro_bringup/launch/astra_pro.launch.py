@@ -21,11 +21,18 @@ def generate_launch_description():
                 PathJoinSubstitution([bringup_share, 'config', 'astra_pro_ir.yaml']),
             ],
         ),
+        DeclareLaunchArgument(
+            'color_info_url',
+            default_value=[
+                'file://',
+                PathJoinSubstitution([bringup_share, 'config', 'astra_pro_color.yaml']),
+            ],
+        ),
     ]
 
     # All node parameters live in config/astra_pro_params.yaml
     # (orbbec_camera + v4l2_camera share one file, each reads its own keys).
-    # The two launch args below win over the yaml on conflict.
+    # Launch args below win over the yaml on conflict.
     orbbec_parameters = [
         PathJoinSubstitution([bringup_share, 'config', 'astra_pro_params.yaml']),
         {
@@ -56,8 +63,9 @@ def generate_launch_description():
                     namespace=[LaunchConfiguration('camera_name'), '/color'],
                     parameters=[
                         PathJoinSubstitution(
-                            [bringup_share, 'config', 'v4l2_color.yaml']
+                            [bringup_share, 'config', 'astra_pro_params.yaml']
                         ),
+                        {'camera_info_url': LaunchConfiguration('color_info_url')},
                     ],
                     output='screen',
                 ),
@@ -80,6 +88,7 @@ def generate_launch_description():
         namespace='color',
         parameters=[
             PathJoinSubstitution([bringup_share, 'config', 'astra_pro_params.yaml']),
+            {'camera_info_url': LaunchConfiguration('color_info_url')},
         ],
     )
     container = ComposableNodeContainer(
