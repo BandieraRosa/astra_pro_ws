@@ -13,7 +13,7 @@ def generate_launch_description():
 
     args = [
         DeclareLaunchArgument('pairs_dir', default_value='/tmp/d2c_pairs'),
-        DeclareLaunchArgument('auto_interval', default_value='0.0'),
+        DeclareLaunchArgument('auto_interval', default_value='2.0'),
         DeclareLaunchArgument('ir_raw_topic', default_value='/camera/ir/image_raw'),
         DeclareLaunchArgument('ir_topic', default_value='/camera/ir/image_mono8'),
         DeclareLaunchArgument('color_topic', default_value='/camera/color/image_raw'),

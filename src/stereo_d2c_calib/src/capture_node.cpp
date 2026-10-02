@@ -55,7 +55,11 @@ D2CCapture::D2CCapture(const rclcpp::NodeOptions &options) : Node("d2c_capture",
   cols_ = declare_parameter<int>("cols", 10);
   rows_ = declare_parameter<int>("rows", 7);
   square_ = declare_parameter<double>("square", 0.02);
-  auto_interval_ = declare_parameter<double>("auto_interval", 0.0);
+  auto_interval_ = declare_parameter<double>("auto_interval", 2.0);
+  if (auto_interval_ <= 0.0) {
+    RCLCPP_WARN(get_logger(), "auto_interval <= 0 with no manual mode; forcing 2.0 s");
+    auto_interval_ = 2.0;
+  }
   std::filesystem::create_directories(out_dir_);
   size_t existing = 0;
   for (const auto &entry : std::filesystem::directory_iterator(out_dir_)) {
@@ -75,8 +79,8 @@ D2CCapture::D2CCapture(const rclcpp::NodeOptions &options) : Node("d2c_capture",
   sub_color_.subscribe(this, color_topic_, rmw_qos_profile_sensor_data);
   sync_ = std::make_shared<Sync>(SyncPolicy(10), sub_ir_, sub_color_);
   sync_->registerCallback(&D2CCapture::callback, this);
-  RCLCPP_INFO(get_logger(), "waiting for synchronized pairs in %s (SPACE=save, Q=quit)",
-              out_dir_.c_str());
+  RCLCPP_INFO(get_logger(), "auto-capturing synchronized pairs in %s every %.1f s (Ctrl-C to stop)",
+              out_dir_.c_str(), auto_interval_);
 }
 
 bool D2CCapture::findBoard(const cv::Mat &gray, int cols, int rows,
@@ -160,23 +164,11 @@ void D2CCapture::callback(const Image::ConstSharedPtr &ir_msg,
   cv::Mat vis;
   cv::hconcat(std::vector<cv::Mat>{vis_ir, vis_color}, vis);
   char status[128];
-  snprintf(status, sizeof(status), "ir:%s color:%s saved:%zu%s", ok_ir ? "OK" : "--",
-           ok_color ? "OK" : "--", saved_,
-           auto_interval_ > 0.0 ? (" AUTO/" + std::to_string(auto_interval_) + "s").c_str()
-                                : " MANUAL");
-  cv::putText(vis, status, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.8,
-              cv::Scalar(0, 255, 0), 2);
-  cv::imshow("ir | color  (SPACE=save, Q=quit)", vis);
-  const int key = cv::waitKey(30) & 0xFF;
-  if (key == 'q' || key == 27) {
-    RCLCPP_INFO(get_logger(), "captured %zu pairs in %s", saved_, out_dir_.c_str());
-    rclcpp::shutdown();
-    return;
-  }
+  snprintf(status, sizeof(status), "ir:%s color:%s saved:%zu AUTO/%.1fs (Ctrl-C to stop)",
+           ok_ir ? "OK" : "--", ok_color ? "OK" : "--", saved_, auto_interval_);
+  RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "%s", status);
   const double now = this->now().seconds();
-  const bool auto_due =
-      auto_interval_ > 0.0 && ok_ir && ok_color && now - last_save_t_ >= auto_interval_;
-  if ((key == ' ' && ok_ir && ok_color) || auto_due) {
+  if (ok_ir && ok_color && now - last_save_t_ >= auto_interval_) {
     if (diverse(c_ir, prev_ir_) && diverse(c_color, prev_color_)) {
       char path[512];
       snprintf(path, sizeof(path), "%s/pair_%03zu.yml", out_dir_.c_str(), saved_);
@@ -190,8 +182,6 @@ void D2CCapture::callback(const Image::ConstSharedPtr &ir_msg,
       last_save_t_ = now;
       RCLCPP_INFO(get_logger(), "saved pair %zu", saved_);
       ++saved_;
-    } else if (key == ' ') {
-      RCLCPP_INFO(get_logger(), "pose too similar, move board");
     }
   }
 }
