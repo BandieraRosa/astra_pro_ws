@@ -13,7 +13,7 @@
 ## Submodule rules
 - Remote is the fork (`BandieraRosa/OrbbecSDK_ROS2`), branch pinned `main-legacy` (`.gitmodules` + `git submodule sync` after URL edits). Parent repo has **no remote**; only the submodule pushes.
 - Driver patch workflow: edit in `src/OrbbecSDK_ROS2` → `colcon build` → commit **inside** submodule → push fork → `git add src/OrbbecSDK_ROS2` in parent.
-- Our driver additions live in `ob_camera_node.{h,cpp}`: `overrideAstraProDepthCalibration`, `setupIrInfoManager`, `applyCalibratedCameraInfo`, factory depth→color-optical TF edge.
+- Our driver additions live in `ob_camera_node.{h,cpp}`: `overrideAstraProDepthCalibration`, `setupIrInfoManager`, `applyCalibratedCameraInfo`. (A factory depth→color-optical TF edge was tried and reverted: firmware D2C is all zeros. The identity edge lives in launch as `static_transform_publisher`.)
 
 ## Hardware truth (Astra Pro, PID 0x0403, FW RD107E-007, USB2.0)
 - No 10 fps profiles exist (all @30, hi-res @7). SDK defaults (10 fps) make the driver `exit(-1)` and kill the whole container. Keep `*_fps: 30`.
