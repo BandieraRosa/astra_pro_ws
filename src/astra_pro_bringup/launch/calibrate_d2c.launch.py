@@ -1,7 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
@@ -18,21 +19,20 @@ def generate_launch_description():
     ]
 
     # mono16 -> mono8 for the calibrator (normalize: brighter, better contrast)
-    converter = Node(
+    converter = ComposableNode(
         package='ir_converter',
-        executable='ir_converter',
+        plugin='ir_converter::IrY10Converter',
         name='ir_converter',
         parameters=[{
             'input_topic': LaunchConfiguration('ir_raw_topic'),
             'output_topic': LaunchConfiguration('ir_topic'),
             'mode': LaunchConfiguration('mode'),
         }],
-        output='screen',
     )
 
-    capture = Node(
+    capture = ComposableNode(
         package='stereo_d2c_calib',
-        executable='d2c_capture',
+        plugin='stereo_d2c_calib::D2CCapture',
         name='d2c_capture',
         parameters=[{
             'out_dir': LaunchConfiguration('pairs_dir'),
@@ -43,7 +43,15 @@ def generate_launch_description():
             'rows': LaunchConfiguration('rows'),
             'square': LaunchConfiguration('square'),
         }],
+    )
+
+    container = ComposableNodeContainer(
+        name='calib_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container',
+        composable_node_descriptions=[converter, capture],
         output='screen',
     )
 
-    return LaunchDescription(args + [converter, capture])
+    return LaunchDescription(args + [container])
