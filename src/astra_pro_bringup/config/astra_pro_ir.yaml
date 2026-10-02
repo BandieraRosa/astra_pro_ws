@@ -1,0 +1,35 @@
+image_width: 640
+image_height: 480
+camera_name: astra_pro_ir
+camera_matrix:
+  rows: 3
+  cols: 3
+  data:
+    [585.414401, 0.0, 332.370276, 0.0, 586.844077, 237.511484, 0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.088199, 0.137705, -0.001702, 0.007441, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data:
+    [
+      578.291931,
+      0.0,
+      336.085349,
+      0.0,
+      0.0,
+      583.120056,
+      236.282821,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+    ]
