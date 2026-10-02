@@ -68,7 +68,8 @@ def cmd_capture(args):
 
     rclpy.init()
     node = Node('d2c_capture')
-    debug_pub = node.create_publisher(Image, '~/debug', 10)
+    debug_ir_pub = node.create_publisher(Image, '~/debug_ir', 10)
+    debug_color_pub = node.create_publisher(Image, '~/debug_color', 10)
     os.makedirs(args.out, exist_ok=True)
     objp = make_object_points(args.cols, args.rows, args.square)
     saved = [n for n in os.listdir(args.out) if n.startswith('pair_')]
@@ -81,16 +82,20 @@ def cmd_capture(args):
             return True
         return float(np.mean(np.abs(corners.reshape(-1, 2) - prev.reshape(-1, 2)))) > 30.0
 
-    def publish_debug(vis, stamp):
+    def publish_side(pub, bgr, corners, ok, idx, tag, stamp, frame_id):
+        if ok:
+            bgr = cv2.drawChessboardCorners(bgr, (args.cols, args.rows), corners, True)
+        cv2.putText(bgr, '%s:%s #%d' % (tag, 'OK' if ok else '--', idx),
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
         msg = Image()
         msg.header.stamp = stamp
-        msg.header.frame_id = 'd2c_capture'
-        msg.height, msg.width = vis.shape[:2]
+        msg.header.frame_id = frame_id
+        msg.height, msg.width = bgr.shape[:2]
         msg.encoding = 'bgr8'
         msg.is_bigendian = False
         msg.step = msg.width * 3
-        msg.data = vis.tobytes()
-        debug_pub.publish(msg)
+        msg.data = bgr.tobytes()
+        pub.publish(msg)
 
     def try_save(c_ir, c_c):
         nonlocal idx, last_save_t
@@ -114,16 +119,16 @@ def cmd_capture(args):
         color_g = cv2.cvtColor(color, cv2.COLOR_BGR2GRAY)
         ok_ir, c_ir = find_board(ir_g, args.cols, args.rows)
         ok_c, c_c = find_board(color_g, args.cols, args.rows)
+        publish_side(debug_ir_pub, cv2.cvtColor(ir_g, cv2.COLOR_GRAY2BGR),
+                     c_ir, ok_ir, idx, 'ir', ir_msg.header.stamp,
+                     ir_msg.header.frame_id)
+        publish_side(debug_color_pub, color.copy(),
+                     c_c, ok_c, idx, 'color', color_msg.header.stamp,
+                     color_msg.header.frame_id)
         vis_ir = cv2.drawChessboardCorners(cv2.cvtColor(ir_g, cv2.COLOR_GRAY2BGR),
                                            (args.cols, args.rows), c_ir, ok_ir)
         vis_c = cv2.drawChessboardCorners(color.copy(), (args.cols, args.rows), c_c, ok_c)
-        status = 'ir:%s color:%s saved:%d%s' % (
-            'OK' if ok_ir else '--', 'OK' if ok_c else '--', idx,
-            ' AUTO/%ss' % args.auto if args.auto > 0 else ' MANUAL')
         vis = np.hstack([cv2.resize(vis_ir, (640, 480)), cv2.resize(vis_c, (640, 480))])
-        cv2.putText(vis, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        publish_debug(vis, ir_msg.header.stamp)
-        cv2.imshow('ir | color  (SPACE=save, Q=quit)', vis)
         key = cv2.waitKey(30) & 0xFF
         if key in (ord('q'), 27):
             print('captured %d pairs in %s' % (idx, args.out), flush=True)
