@@ -1,11 +1,16 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    bringup_share = FindPackageShare('astra_pro_bringup')
+
     args = [
         DeclareLaunchArgument('pairs_dir', default_value='/tmp/d2c_pairs'),
         DeclareLaunchArgument('auto_interval', default_value='0.0'),
@@ -16,7 +21,37 @@ def generate_launch_description():
         DeclareLaunchArgument('cols', default_value='10'),
         DeclareLaunchArgument('rows', default_value='7'),
         DeclareLaunchArgument('square', default_value='0.02'),
+        # false when cameras are already running elsewhere
+        DeclareLaunchArgument('with_cameras', default_value='true'),
+        DeclareLaunchArgument('camera_name', default_value='camera'),
+        DeclareLaunchArgument(
+            'ir_info_url',
+            default_value=[
+                'file://',
+                PathJoinSubstitution([bringup_share, 'config', 'astra_pro_ir.yaml']),
+            ],
+        ),
+        DeclareLaunchArgument(
+            'color_info_url',
+            default_value=[
+                'file://',
+                PathJoinSubstitution([bringup_share, 'config', 'astra_pro_color.yaml']),
+            ],
+        ),
     ]
+
+    # Camera stack (orbbec + v4l2 + flip relay + static TF).
+    cameras = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([bringup_share, 'launch', 'astra_pro.launch.py'])
+        ),
+        launch_arguments={
+            'camera_name': LaunchConfiguration('camera_name'),
+            'ir_info_url': LaunchConfiguration('ir_info_url'),
+            'color_info_url': LaunchConfiguration('color_info_url'),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration('with_cameras')),
+    )
 
     # mono16 -> mono8 for the calibrator (normalize: brighter, better contrast)
     converter = ComposableNode(
@@ -54,4 +89,4 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription(args + [container])
+    return LaunchDescription(args + [cameras, container])
