@@ -144,25 +144,26 @@ void D2CCapture::callback(const Image::ConstSharedPtr &ir_msg,
   std::vector<cv::Point2f> c_ir, c_color;
   const bool ok_ir = findBoard(ir_gray, cols_, rows_, c_ir);
   const bool ok_color = findBoard(color_gray, cols_, rows_, c_color);
-  publishSide(debug_ir_pub_, toBgrDisplay(ir_gray), c_ir, ok_ir, "ir", saved_,
-              ir_msg->header);
-  // color_msg may be rgb8: rebuild a BGR display copy for drawing
-  cv::Mat color_bgr;
-  if (color_msg->encoding == "rgb8") {
-    cv::Mat tmp(color_msg->height, color_msg->width, CV_8UC3,
-                const_cast<uint8_t *>(color_msg->data.data()), color_msg->step);
-    cv::cvtColor(tmp, color_bgr, cv::COLOR_RGB2BGR);
-  } else {
-    color_bgr = toBgrDisplay(color_gray);
+  // Debug views are throttled: detection runs full-rate for capture,
+  // visualization does not need 30 Hz (and would backlog the pubs).
+  const double now_dbg = this->now().seconds();
+  if (now_dbg - last_debug_t_ >= 0.2) {
+    last_debug_t_ = now_dbg;
+    publishSide(debug_ir_pub_, toBgrDisplay(ir_gray), c_ir, ok_ir, "ir", saved_,
+                ir_msg->header);
+    // color_msg may be rgb8: rebuild a BGR display copy for drawing
+    cv::Mat color_bgr;
+    if (color_msg->encoding == "rgb8") {
+      cv::Mat tmp(color_msg->height, color_msg->width, CV_8UC3,
+                  const_cast<uint8_t *>(color_msg->data.data()), color_msg->step);
+      cv::cvtColor(tmp, color_bgr, cv::COLOR_RGB2BGR);
+    } else {
+      color_bgr = toBgrDisplay(color_gray);
+    }
+    publishSide(debug_color_pub_, color_bgr, c_color, ok_color, "color", saved_,
+                color_msg->header);
   }
-  publishSide(debug_color_pub_, color_bgr, c_color, ok_color, "color", saved_,
-              color_msg->header);
 
-  cv::Mat vis_ir, vis_color;
-  cv::resize(toBgrDisplay(ir_gray), vis_ir, cv::Size(640, 480));
-  cv::resize(color_bgr, vis_color, cv::Size(640, 480));
-  cv::Mat vis;
-  cv::hconcat(std::vector<cv::Mat>{vis_ir, vis_color}, vis);
   char status[128];
   snprintf(status, sizeof(status), "ir:%s color:%s saved:%zu AUTO/%.1fs (Ctrl-C to stop)",
            ok_ir ? "OK" : "--", ok_color ? "OK" : "--", saved_, auto_interval_);
