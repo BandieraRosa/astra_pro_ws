@@ -55,7 +55,7 @@
     ir_height: 480
     ir_fps: 30
     ir_format: "Y10"
-    enable_ir: false
+    enable_ir: true
     flip_ir: false
     ir_qos: "default"
     ir_camera_info_qos: "default"
