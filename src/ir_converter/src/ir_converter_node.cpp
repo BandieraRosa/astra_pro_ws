@@ -15,6 +15,8 @@ class IrY10Converter : public rclcpp::Node
     input_topic_ = declare_parameter<std::string>("input_topic", "/camera/ir/image_raw");
     output_topic_ =
         declare_parameter<std::string>("output_topic", "/camera/ir/image_mono8");
+    // linear: fixed >>2 map (predictable); normalize: per-frame min-max stretch (brighter)
+    mode_ = declare_parameter<std::string>("mode", "linear");
     const auto qos_profile = declare_parameter<std::string>("qos_profile", "sensor_data");
     const auto qos_depth = declare_parameter<int>("qos_depth", 10);
 
@@ -92,6 +94,22 @@ class IrY10Converter : public rclcpp::Node
       }
     }
 
+    if (mode_ == "normalize")
+    {
+      const auto lo = static_cast<int>(min_value >> 2);
+      const auto hi = static_cast<int>(max_value >> 2);
+      if (hi > lo)
+      {
+        const float gain = 255.0f / static_cast<float>(hi - lo);
+        for (auto &px : out.data)
+        {
+          // out.data currently holds value>>2; stretch that domain to full range
+          float v = (static_cast<float>(px) - static_cast<float>(lo)) * gain;
+          px = static_cast<uint8_t>(std::clamp(v, 0.0f, 255.0f));
+        }
+      }
+    }
+
     cv::Mat mono8(out.height, out.width, CV_8UC1, out.data.data(), out.step);
 
     cv::Mat filtered;
@@ -111,6 +129,7 @@ class IrY10Converter : public rclcpp::Node
 
   std::string input_topic_;
   std::string output_topic_;
+  std::string mode_;
 };
 
 int main(int argc, char** argv)
