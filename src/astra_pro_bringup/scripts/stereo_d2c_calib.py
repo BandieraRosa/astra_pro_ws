@@ -59,6 +59,8 @@ def decode_image(msg):
 
 
 def cmd_capture(args):
+    import time
+
     import rclpy
     from rclpy.node import Node
     from sensor_msgs.msg import Image
@@ -66,19 +68,42 @@ def cmd_capture(args):
 
     rclpy.init()
     node = Node('d2c_capture')
+    debug_pub = node.create_publisher(Image, '~/debug', 10)
     os.makedirs(args.out, exist_ok=True)
     objp = make_object_points(args.cols, args.rows, args.square)
     saved = [n for n in os.listdir(args.out) if n.startswith('pair_')]
     idx = len(saved)
     last = {'ir': None, 'color': None}
+    last_save_t = 0.0
 
     def diverse(corners, prev):
         if prev is None:
             return True
         return float(np.mean(np.abs(corners.reshape(-1, 2) - prev.reshape(-1, 2)))) > 30.0
 
+    def publish_debug(vis, stamp):
+        msg = Image()
+        msg.header.stamp = stamp
+        msg.header.frame_id = 'd2c_capture'
+        msg.height, msg.width = vis.shape[:2]
+        msg.encoding = 'bgr8'
+        msg.is_bigendian = False
+        msg.step = msg.width * 3
+        msg.data = vis.tobytes()
+        debug_pub.publish(msg)
+
+    def try_save(c_ir, c_c):
+        nonlocal idx, last_save_t
+        if not (diverse(c_ir, last['ir']) and diverse(c_c, last['color'])):
+            return False
+        np.savez(os.path.join(args.out, 'pair_%03d.npz' % idx),
+                 ir=c_ir.reshape(-1, 2), color=c_c.reshape(-1, 2))
+        last['ir'], last['color'] = c_ir, c_c
+        last_save_t = time.monotonic()
+        idx += 1
+        return True
+
     def cb(ir_msg, color_msg):
-        nonlocal idx
         try:
             ir = decode_image(ir_msg)
             color = decode_image(color_msg)
@@ -92,22 +117,25 @@ def cmd_capture(args):
         vis_ir = cv2.drawChessboardCorners(cv2.cvtColor(ir_g, cv2.COLOR_GRAY2BGR),
                                            (args.cols, args.rows), c_ir, ok_ir)
         vis_c = cv2.drawChessboardCorners(color.copy(), (args.cols, args.rows), c_c, ok_c)
+        status = 'ir:%s color:%s saved:%d%s' % (
+            'OK' if ok_ir else '--', 'OK' if ok_c else '--', idx,
+            ' AUTO/%ss' % args.auto if args.auto > 0 else ' MANUAL')
         vis = np.hstack([cv2.resize(vis_ir, (640, 480)), cv2.resize(vis_c, (640, 480))])
-        cv2.imshow('ir | color  (SPACE=save %d, Q=quit)' % idx, vis)
+        cv2.putText(vis, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        publish_debug(vis, ir_msg.header.stamp)
+        cv2.imshow('ir | color  (SPACE=save, Q=quit)', vis)
         key = cv2.waitKey(30) & 0xFF
-        if key == ord(' ') and ok_ir and ok_c:
-            if not (diverse(c_ir, last['ir']) and diverse(c_c, last['color'])):
-                print('pose too similar, move board', flush=True)
-                return
-            np.savez(os.path.join(args.out, 'pair_%03d.npz' % idx),
-                     ir=c_ir.reshape(-1, 2), color=c_c.reshape(-1, 2))
-            last['ir'], last['color'] = c_ir, c_c
-            idx += 1
-            print('saved pair %d' % (idx - 1), flush=True)
-        elif key in (ord('q'), 27):
+        if key in (ord('q'), 27):
             print('captured %d pairs in %s' % (idx, args.out), flush=True)
             rclpy.shutdown()
             sys.exit(0)
+        auto_due = (args.auto > 0 and ok_ir and ok_c
+                    and time.monotonic() - last_save_t >= args.auto)
+        if (key == ord(' ') and ok_ir and ok_c) or auto_due:
+            if try_save(c_ir, c_c):
+                print('saved pair %d' % (idx - 1), flush=True)
+            elif key == ord(' '):
+                print('pose too similar, move board', flush=True)
 
     sub_ir = message_filters.Subscriber(node, Image, args.ir_topic)
     sub_c = message_filters.Subscriber(node, Image, args.color_topic)
@@ -162,6 +190,8 @@ def main():
     c.add_argument('--cols', type=int, default=10, help='inner corners per row (11 squares -> 10)')
     c.add_argument('--rows', type=int, default=7, help='inner corners per col (8 squares -> 7)')
     c.add_argument('--square', type=float, default=0.02)
+    c.add_argument('--auto', type=float, default=0.0,
+                   help='auto-save interval seconds when both detected (0=manual SPACE)')
     s = sub.add_parser('solve')
     s.add_argument('--pairs', required=True)
     s.add_argument('--ir-yaml', required=True)
