@@ -1,7 +1,7 @@
 # Per-node parameters. Top-level keys must match node FULL names
 # (namespace + node name):
-#   '/camera/orbbec'                   <- orbbec composable node (namespace /<camera_name>, fixed node name)
-#   '/camera/color/v4l2_camera_node' <- v4l2 node
+#   '/camera/orbbec'                    <- orbbec composable node (namespace /<camera_name>, fixed node name)
+#   '/camera/color/v4l2_camera_node'    <- v4l2 node
 # Renaming camera_name requires renaming the keys below accordingly.
 # (launch_ros only matches full node names, bare names are silently ignored.)
 #
@@ -11,19 +11,29 @@
 /camera/orbbec:
   ros__parameters:
     # ---- orbbec_camera (astra.launch.py) ----
+    # 命名空间 / 帧ID前缀 (camera_link 等均由此派生)
     camera_name: "camera"
+    # depth 向 color 对齐; 要求 color+depth 同时使能, 否则对齐帧悬空. 当前 false
     depth_registration: false
+    # 三选一指定设备 (全空则用默认设备)
     serial_number: ""
     usb_port: ""
     device_num: 1
+    # USB VID/PID 过滤
     vendor_id: "0x2bc5"
     product_id: ""
+    # 发布 depth/points 单色点云
     enable_point_cloud: true
+    # 彩色点云 depth_registered/points; 强依赖内部 color 流(不认 v4l2), 开启会强制开对齐
     enable_colored_point_cloud: false
+    # 点云 QoS 预设
     point_cloud_qos: "default"
+    # 建链前等待毫秒数
     connection_delay: 100
+    # 彩色流 (本机 Astra Pro 经 SDK 无可用 color profile, 保持关闭, color 走 v4l2)
     color_width: 640
     color_height: 480
+    # 固件无 10fps 档, 全流统一用 30
     color_fps: 30
     color_format: "RGB"
     enable_color: false
@@ -31,6 +41,7 @@
     color_qos: "default"
     color_camera_info_qos: "default"
     enable_color_auto_exposure: true
+    # 深度流 (本机实测仅 Y11/Y12 @30 可用)
     depth_width: 640
     depth_height: 480
     depth_fps: 30
@@ -39,6 +50,7 @@
     flip_depth: false
     depth_qos: "default"
     depth_camera_info_qos: "default"
+    # IR 流 (与 depth 同 sensor; 固件仅 Y10 @30 可用)
     ir_width: 640
     ir_height: 480
     ir_fps: 30
@@ -48,26 +60,41 @@
     ir_qos: "default"
     ir_camera_info_qos: "default"
     enable_ir_auto_exposure: true
+    # 发布 TF; >0 时以该频率重发 /tf, =0 则只发一次 /tf_static
     publish_tf: true
     tf_publish_rate: 10.0
+    # IR 标定文件; 由 driver 经 CameraInfoManager 读入并覆盖进 SDK (无/非法则回退内置值)
     ir_info_url: ""
+    # 本分支 driver 忽略此项 (保留占位)
     color_info_url: ""
     log_level: "none"
+    # 发布 /camera/extrinsic/depth_to_color 外参话题
     enable_publish_extrinsic: false
+    # D2C 对齐预览小工具 (需内部 color+depth)
     enable_d2c_viewer: false
+    # LDP(激光)使能
     enable_ldp: true
+    # 软件滤波; max_diff/speckle_size 为 -1 表示用 SDK 默认
     enable_soft_filter: true
     soft_filter_max_diff: -1
     soft_filter_speckle_size: -1
+    # true: 点云保持宽x高排布(含无效点); false: 只发有效点
     ordered_pc: false
+    # true: 用设备硬件时间戳; false: 用系统到达时间
     use_hardware_time: false
+    # 应用 SDK depth 数值缩放
     enable_depth_scale: true
+    # 对齐模式 HW/SW (开对齐时有效)
     align_mode: "HW"
 
 /camera/color/v4l2_camera_node:
   ros__parameters:
+    # USB 彩色头 (本机 Astra Pro UVC 节点)
     video_device: "/dev/video2"
+    # 采集像素格式 (YUYV 无原生 rgb8, 驱动软转, 占 CPU)
     pixel_format: "YUYV"
+    # 输出编码
     output_encoding: "rgb8"
     image_size: [640, 480]
+    # 标定文件占位, 实际由 launch 的 color_info_url 覆盖
     camera_info_url: ""
