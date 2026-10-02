@@ -24,7 +24,7 @@
     connection_delay: 100
     color_width: 640
     color_height: 480
-    color_fps: 10
+    color_fps: 30
     color_format: "RGB"
     enable_color: false
     flip_color: false
@@ -41,7 +41,7 @@
     depth_camera_info_qos: "default"
     ir_width: 640
     ir_height: 480
-    ir_fps: 10
+    ir_fps: 30
     ir_format: "Y10"
     enable_ir: false
     flip_ir: false
