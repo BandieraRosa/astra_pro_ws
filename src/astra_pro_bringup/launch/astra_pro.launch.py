@@ -100,8 +100,9 @@ def generate_launch_description():
         output='screen',
     )
 
-    # camera_color_optical_frame 挂进 TF 树 (父系 camera_depth_optical_frame, 初值重合;
-    # 有外参标定后再填 xyz/rpy). 与 yaml 中 camera_frame_id 对应.
+    # color optical frame 挂进 TF 树. 注意: 固件内部 D2C 外参实测全零
+    # (未标定占位), 不可用, 此处初值取重合, 有外部立体标定后再填 xyz/rpy.
+    # 与 yaml 中 camera_frame_id 对应.
     color_optical_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',

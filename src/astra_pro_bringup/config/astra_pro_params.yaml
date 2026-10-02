@@ -68,8 +68,8 @@
     # 本分支 driver 忽略此项 (保留占位)
     color_info_url: ""
     log_level: "none"
-    # 发布 /camera/extrinsic/depth_to_color 外参话题
-    enable_publish_extrinsic: true
+    # 本分支 driver 不读此项; 且固件内部 D2C 外参实测全零(未标定), 不可用. 保持关闭
+    enable_publish_extrinsic: false
     # D2C 对齐预览小工具 (需内部 color+depth)
     enable_d2c_viewer: false
     # LDP(激光)使能
