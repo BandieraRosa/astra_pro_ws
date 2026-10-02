@@ -100,11 +100,25 @@ def generate_launch_description():
         output='screen',
     )
 
+    # camera_color_optical_frame 挂进 TF 树 (父系 camera_depth_optical_frame, 初值重合;
+    # 有外参标定后再填 xyz/rpy). 与 yaml 中 camera_frame_id 对应.
+    color_optical_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='color_optical_static_tf',
+        arguments=[
+            '0', '0', '0', '0', '0', '0',
+            'camera_depth_optical_frame', 'camera_color_optical_frame',
+        ],
+        output='screen',
+    )
+
     return LaunchDescription(
         args
         + [
             GroupAction(
                 [PushRosNamespace(LaunchConfiguration('camera_name')), container]
             ),
+            color_optical_tf,
         ]
     )

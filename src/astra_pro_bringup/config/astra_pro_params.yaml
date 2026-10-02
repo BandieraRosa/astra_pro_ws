@@ -69,7 +69,7 @@
     color_info_url: ""
     log_level: "none"
     # 发布 /camera/extrinsic/depth_to_color 外参话题
-    enable_publish_extrinsic: false
+    enable_publish_extrinsic: true
     # D2C 对齐预览小工具 (需内部 color+depth)
     enable_d2c_viewer: false
     # LDP(激光)使能
@@ -96,5 +96,7 @@
     # 输出编码
     output_encoding: "rgb8"
     image_size: [640, 480]
+    # 图像 header 系: 光学系约定. 对应 static TF 见 launch (父系 camera_depth_optical_frame, 初值重合)
+    camera_frame_id: "camera_color_optical_frame"
     # 标定文件占位, 实际由 launch 的 color_info_url 覆盖
     camera_info_url: ""
