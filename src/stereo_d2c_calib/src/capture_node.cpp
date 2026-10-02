@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <limits>
 #include <stdexcept>
 
 #include <rclcpp_components/register_node_macro.hpp>
@@ -61,17 +62,33 @@ D2CCapture::D2CCapture(const rclcpp::NodeOptions &options) : Node("d2c_capture",
     auto_interval_ = 2.0;
   }
   std::filesystem::create_directories(out_dir_);
-  size_t existing = 0;
+  size_t next_index = 0;
   for (const auto &entry : std::filesystem::directory_iterator(out_dir_)) {
-    if (entry.path().extension() == ".yml" &&
-        entry.path().filename().string().rfind("pair_", 0) == 0) {
-      ++existing;
+    const std::string filename = entry.path().filename().string();
+    if (entry.path().extension() != ".yml" || filename.rfind("pair_", 0) != 0 ||
+        filename.size() <= 9) {
+      continue;
+    }
+    const std::string number = filename.substr(5, filename.size() - 5 - 4);
+    if (number.empty() || number.find_first_not_of("0123456789") != std::string::npos) {
+      RCLCPP_WARN(get_logger(), "ignoring malformed pair filename: %s", filename.c_str());
+      continue;
+    }
+    try {
+      const auto parsed = std::stoull(number);
+      if (parsed >= std::numeric_limits<size_t>::max()) {
+        RCLCPP_WARN(get_logger(), "ignoring exhausted pair filename: %s", filename.c_str());
+        continue;
+      }
+      next_index = std::max(next_index, static_cast<size_t>(parsed + 1));
+    } catch (const std::exception &) {
+      RCLCPP_WARN(get_logger(), "ignoring malformed pair filename: %s", filename.c_str());
     }
   }
-  saved_ = existing;
+  saved_ = next_index;
 
-  debug_ir_pub_ = create_publisher<Image>("~/debug_ir", 10);
-  debug_color_pub_ = create_publisher<Image>("~/debug_color", 10);
+  debug_ir_pub_ = create_publisher<Image>("~/debug_ir", rclcpp::SensorDataQoS());
+  debug_color_pub_ = create_publisher<Image>("~/debug_color", rclcpp::SensorDataQoS());
 
   // Both inputs are best-effort (v4l2 SensorDataQoS, ir_converter
   // sensor_data default); reliable subs would never match -> silence.

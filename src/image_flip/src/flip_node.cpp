@@ -1,6 +1,6 @@
 // Horizontal-flip relay: republishes image + camera_info in the
-// unmirrored domain. Under x' = W - x the pinhole/distortion map as:
-//   cx' = W - cx, p2' = -p2 (d[3]), everything else unchanged.
+// unmirrored domain. Under x' = W - 1 - x the pinhole/distortion map is:
+//   cx' = W - 1 - cx, p2' = -p2 (d[3]), everything else unchanged.
 // Applies to plumb_bob (5 coeff) and rational_polynomial (8 coeff),
 // whose d ordering shares the k1,k2,p1,p2,k3 prefix.
 #include <algorithm>
@@ -88,9 +88,9 @@ private:
     sensor_msgs::msg::CameraInfo info = info_;
     info.header.stamp = msg->header.stamp;
     if (info.width == msg->width && info.height == msg->height && info.k.size() == 9) {
-      info.k[2] = static_cast<double>(info.width) - info.k[2];
+      info.k[2] = static_cast<double>(info.width - 1) - info.k[2];
       if (info.p.size() == 12) {
-        info.p[2] = static_cast<double>(info.width) - info.p[2];
+        info.p[2] = static_cast<double>(info.width - 1) - info.p[2];
       }
       if (info.d.size() >= 4) {
         info.d[3] = -info.d[3];

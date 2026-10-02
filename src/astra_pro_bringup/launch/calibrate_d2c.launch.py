@@ -16,6 +16,8 @@ def generate_launch_description():
         DeclareLaunchArgument('auto_interval', default_value='2.0'),
         DeclareLaunchArgument('ir_raw_topic', default_value='/camera/ir/image_raw'),
         DeclareLaunchArgument('ir_topic', default_value='/camera/ir/image_mono8'),
+        # Capture the raw mirrored stream; d2c_solve --flip-color applies the
+        # matching image-coordinate and intrinsic-camera correction.
         DeclareLaunchArgument('color_topic', default_value='/camera/color/image_raw'),
         DeclareLaunchArgument('mode', default_value='normalize'),
         DeclareLaunchArgument('cols', default_value='10'),

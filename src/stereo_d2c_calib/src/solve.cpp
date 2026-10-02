@@ -3,7 +3,7 @@
 //   d2c_solve --pairs DIR --ir-yaml IR.yaml --color-yaml COLOR.yaml
 //             [--cols 10] [--rows 7] [--square 0.02] [--flip-color]
 // With --flip-color, mirrored color corners/yaml are unmirrored in memory
-// (x' = W - x, cx' = W - cx, p2' = -p2) so the solve runs true-domain.
+// (x' = W - 1 - x, cx' = W - 1 - cx, p2' = -p2) so the solve runs true-domain.
 // Prints R/T plus ready static_transform_publisher arguments.
 #include <cmath>
 #include <cstdio>
@@ -105,13 +105,36 @@ bool loadCamInfo(const std::string &path, cv::Mat &k, cv::Mat &d, cv::Size &size
 
 void rmatToQuat(const cv::Mat &r, double &qx, double &qy, double &qz, double &qw)
 {
-  qw = std::sqrt(std::max(0.0, 1.0 + r.at<double>(0, 0) + r.at<double>(1, 1) +
-                                   r.at<double>(2, 2))) /
-       2.0;
-  const double s = 4.0 * qw;
-  qx = (r.at<double>(2, 1) - r.at<double>(1, 2)) / s;
-  qy = (r.at<double>(0, 2) - r.at<double>(2, 0)) / s;
-  qz = (r.at<double>(1, 0) - r.at<double>(0, 1)) / s;
+  const double trace = r.at<double>(0, 0) + r.at<double>(1, 1) + r.at<double>(2, 2);
+  if (trace > 0.0) {
+    const double s = 2.0 * std::sqrt(trace + 1.0);
+    qw = 0.25 * s;
+    qx = (r.at<double>(2, 1) - r.at<double>(1, 2)) / s;
+    qy = (r.at<double>(0, 2) - r.at<double>(2, 0)) / s;
+    qz = (r.at<double>(1, 0) - r.at<double>(0, 1)) / s;
+  } else if (r.at<double>(0, 0) > r.at<double>(1, 1) &&
+             r.at<double>(0, 0) > r.at<double>(2, 2)) {
+    const double s = 2.0 * std::sqrt(1.0 + r.at<double>(0, 0) - r.at<double>(1, 1) -
+                                     r.at<double>(2, 2));
+    qw = (r.at<double>(2, 1) - r.at<double>(1, 2)) / s;
+    qx = 0.25 * s;
+    qy = (r.at<double>(0, 1) + r.at<double>(1, 0)) / s;
+    qz = (r.at<double>(0, 2) + r.at<double>(2, 0)) / s;
+  } else if (r.at<double>(1, 1) > r.at<double>(2, 2)) {
+    const double s = 2.0 * std::sqrt(1.0 + r.at<double>(1, 1) - r.at<double>(0, 0) -
+                                     r.at<double>(2, 2));
+    qw = (r.at<double>(0, 2) - r.at<double>(2, 0)) / s;
+    qx = (r.at<double>(0, 1) + r.at<double>(1, 0)) / s;
+    qy = 0.25 * s;
+    qz = (r.at<double>(1, 2) + r.at<double>(2, 1)) / s;
+  } else {
+    const double s = 2.0 * std::sqrt(1.0 + r.at<double>(2, 2) - r.at<double>(0, 0) -
+                                     r.at<double>(1, 1));
+    qw = (r.at<double>(1, 0) - r.at<double>(0, 1)) / s;
+    qx = (r.at<double>(0, 2) + r.at<double>(2, 0)) / s;
+    qy = (r.at<double>(1, 2) + r.at<double>(2, 1)) / s;
+    qz = 0.25 * s;
+  }
 }
 
 }  // namespace
@@ -137,7 +160,7 @@ int main(int argc, char **argv)
   }
   double flip_w = 0.0;
   if (args.flip_color) {
-    flip_w = static_cast<double>(size_c.width);
+    flip_w = static_cast<double>(size_c.width - 1);
     k_c.at<double>(0, 2) = flip_w - k_c.at<double>(0, 2);
     d_c.at<double>(0, 3) = -d_c.at<double>(0, 3);
     std::cout << "color unmirrored in memory (W=" << size_c.width << ")" << std::endl;
