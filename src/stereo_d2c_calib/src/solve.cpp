@@ -1,3 +1,17 @@
+// Copyright 2026 BandieraRossa
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // D2C stereo solve: fixed-intrinsic stereoCalibrate over captured pairs.
 // Usage:
 //   d2c_solve --pairs DIR --ir-yaml IR.yaml --color-yaml COLOR.yaml
@@ -20,7 +34,8 @@
 namespace
 {
 
-struct Args {
+struct Args
+{
   std::string pairs;
   std::string ir_yaml;
   std::string color_yaml;
@@ -30,17 +45,17 @@ struct Args {
   bool flip_color = false;
 };
 
-bool parseArgs(int argc, char **argv, Args &args)
+bool parseArgs(int argc, char ** argv, Args & args)
 {
   for (int i = 1; i < argc; ++i) {
     const std::string key = argv[i];
-    auto need = [&](std::string &out) {
-      if (i + 1 >= argc) {
-        return false;
-      }
-      out = argv[++i];
-      return true;
-    };
+    auto need = [&](std::string & out) {
+        if (i + 1 >= argc) {
+          return false;
+        }
+        out = argv[++i];
+        return true;
+      };
     if (key == "--pairs") {
       if (!need(args.pairs)) {
         return false;
@@ -83,7 +98,7 @@ bool parseArgs(int argc, char **argv, Args &args)
   return !args.pairs.empty() && !args.ir_yaml.empty() && !args.color_yaml.empty();
 }
 
-bool loadCamInfo(const std::string &path, cv::Mat &k, cv::Mat &d, cv::Size &size)
+bool loadCamInfo(const std::string & path, cv::Mat & k, cv::Mat & d, cv::Size & size)
 {
   std::string name;
   sensor_msgs::msg::CameraInfo info;
@@ -96,14 +111,15 @@ bool loadCamInfo(const std::string &path, cv::Mat &k, cv::Mat &d, cv::Size &size
     return false;
   }
   k = cv::Mat(3, 3, CV_64F, const_cast<double *>(info.k.data())).clone();
-  d = cv::Mat(1, static_cast<int>(info.d.size()), CV_64F,
-              const_cast<double *>(info.d.data()))
-          .clone();
+  d = cv::Mat(
+    1, static_cast<int>(info.d.size()), CV_64F,
+    const_cast<double *>(info.d.data()))
+    .clone();
   size = cv::Size(static_cast<int>(info.width), static_cast<int>(info.height));
   return true;
 }
 
-void rmatToQuat(const cv::Mat &r, double &qx, double &qy, double &qz, double &qw)
+void rmatToQuat(const cv::Mat & r, double & qx, double & qy, double & qz, double & qw)
 {
   const double trace = r.at<double>(0, 0) + r.at<double>(1, 1) + r.at<double>(2, 2);
   if (trace > 0.0) {
@@ -113,23 +129,27 @@ void rmatToQuat(const cv::Mat &r, double &qx, double &qy, double &qz, double &qw
     qy = (r.at<double>(0, 2) - r.at<double>(2, 0)) / s;
     qz = (r.at<double>(1, 0) - r.at<double>(0, 1)) / s;
   } else if (r.at<double>(0, 0) > r.at<double>(1, 1) &&
-             r.at<double>(0, 0) > r.at<double>(2, 2)) {
-    const double s = 2.0 * std::sqrt(1.0 + r.at<double>(0, 0) - r.at<double>(1, 1) -
-                                     r.at<double>(2, 2));
+    r.at<double>(0, 0) > r.at<double>(2, 2))
+  {
+    const double s = 2.0 * std::sqrt(
+      1.0 + r.at<double>(0, 0) - r.at<double>(1, 1) -
+      r.at<double>(2, 2));
     qw = (r.at<double>(2, 1) - r.at<double>(1, 2)) / s;
     qx = 0.25 * s;
     qy = (r.at<double>(0, 1) + r.at<double>(1, 0)) / s;
     qz = (r.at<double>(0, 2) + r.at<double>(2, 0)) / s;
   } else if (r.at<double>(1, 1) > r.at<double>(2, 2)) {
-    const double s = 2.0 * std::sqrt(1.0 + r.at<double>(1, 1) - r.at<double>(0, 0) -
-                                     r.at<double>(2, 2));
+    const double s = 2.0 * std::sqrt(
+      1.0 + r.at<double>(1, 1) - r.at<double>(0, 0) -
+      r.at<double>(2, 2));
     qw = (r.at<double>(0, 2) - r.at<double>(2, 0)) / s;
     qx = (r.at<double>(0, 1) + r.at<double>(1, 0)) / s;
     qy = 0.25 * s;
     qz = (r.at<double>(1, 2) + r.at<double>(2, 1)) / s;
   } else {
-    const double s = 2.0 * std::sqrt(1.0 + r.at<double>(2, 2) - r.at<double>(0, 0) -
-                                     r.at<double>(1, 1));
+    const double s = 2.0 * std::sqrt(
+      1.0 + r.at<double>(2, 2) - r.at<double>(0, 0) -
+      r.at<double>(1, 1));
     qw = (r.at<double>(1, 0) - r.at<double>(0, 1)) / s;
     qx = (r.at<double>(0, 2) + r.at<double>(2, 0)) / s;
     qy = (r.at<double>(1, 2) + r.at<double>(2, 1)) / s;
@@ -139,19 +159,20 @@ void rmatToQuat(const cv::Mat &r, double &qx, double &qy, double &qz, double &qw
 
 }  // namespace
 
-int main(int argc, char **argv)
+int main(int argc, char ** argv)
 {
   Args args;
   if (!parseArgs(argc, argv, args)) {
     std::cerr << "usage: d2c_solve --pairs DIR --ir-yaml IR.yaml --color-yaml COLOR.yaml "
-                 "[--cols 10] [--rows 7] [--square 0.02] [--flip-color]"
+      "[--cols 10] [--rows 7] [--square 0.02] [--flip-color]"
               << std::endl;
     return 1;
   }
   cv::Mat k_ir, d_ir, k_c, d_c;
   cv::Size size_ir, size_c;
   if (!loadCamInfo(args.ir_yaml, k_ir, d_ir, size_ir) ||
-      !loadCamInfo(args.color_yaml, k_c, d_c, size_c)) {
+    !loadCamInfo(args.color_yaml, k_c, d_c, size_c))
+  {
     return 1;
   }
   if (size_ir != size_c) {
@@ -174,7 +195,7 @@ int main(int argc, char **argv)
       objp.emplace_back(c * args.square, r * args.square, 0.0f);
     }
   }
-  for (const auto &entry : std::filesystem::directory_iterator(args.pairs)) {
+  for (const auto & entry : std::filesystem::directory_iterator(args.pairs)) {
     if (entry.path().extension() != ".yml") {
       continue;
     }
@@ -197,17 +218,20 @@ int main(int argc, char **argv)
     mir = mir.reshape(1);
     mc = mc.reshape(1);
     std::vector<cv::Point2f> vir, vc;
-    vir.assign(reinterpret_cast<cv::Point2f *>(mir.data),
-               reinterpret_cast<cv::Point2f *>(mir.data) + mir.rows);
-    vc.assign(reinterpret_cast<cv::Point2f *>(mc.data),
-              reinterpret_cast<cv::Point2f *>(mc.data) + mc.rows);
+    vir.assign(
+      reinterpret_cast<cv::Point2f *>(mir.data),
+      reinterpret_cast<cv::Point2f *>(mir.data) + mir.rows);
+    vc.assign(
+      reinterpret_cast<cv::Point2f *>(mc.data),
+      reinterpret_cast<cv::Point2f *>(mc.data) + mc.rows);
     if (flip_w > 0.0) {
-      for (auto &p : vc) {
+      for (auto & p : vc) {
         p.x = static_cast<float>(flip_w) - p.x;
       }
     }
     if (vir.size() != static_cast<size_t>(args.cols * args.rows) ||
-        vc.size() != static_cast<size_t>(args.cols * args.rows)) {
+      vc.size() != static_cast<size_t>(args.cols * args.rows))
+    {
       std::cerr << "bad corner count in " << name << std::endl;
       continue;
     }
@@ -222,9 +246,9 @@ int main(int argc, char **argv)
   std::cout << "solving from " << objpoints.size() << " pairs ..." << std::endl;
   cv::Mat R, T, E, F;
   const double rmse = cv::stereoCalibrate(
-      objpoints, img_ir, img_c, k_ir, d_ir, k_c, d_c, size_ir, R, T, E, F,
-      cv::CALIB_FIX_INTRINSIC,
-      cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 200, 1e-6));
+    objpoints, img_ir, img_c, k_ir, d_ir, k_c, d_c, size_ir, R, T, E, F,
+    cv::CALIB_FIX_INTRINSIC,
+    cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 200, 1e-6));
   const double baseline = cv::norm(T);
   double qx, qy, qz, qw;
   rmatToQuat(R, qx, qy, qz, qw);
@@ -232,9 +256,10 @@ int main(int argc, char **argv)
   printf("baseline |T|: %.4f m (expect ~0.02-0.04)\n", baseline);
   printf("T (m): %.6f %.6f %.6f\n", T.at<double>(0), T.at<double>(1), T.at<double>(2));
   printf("static_transform_publisher args:\n");
-  printf("  %.6f %.6f %.6f %.6f %.6f %.6f %.6f camera_depth_optical_frame "
-         "camera_color_optical_frame\n",
-         T.at<double>(0), T.at<double>(1), T.at<double>(2), qx, qy, qz, qw);
+  printf(
+    "  %.6f %.6f %.6f %.6f %.6f %.6f %.6f camera_depth_optical_frame "
+    "camera_color_optical_frame\n",
+    T.at<double>(0), T.at<double>(1), T.at<double>(2), qx, qy, qz, qw);
   cv::FileStorage fs(args.pairs + "/d2c_result.yml", cv::FileStorage::WRITE);
   fs << "R" << R << "T" << T << "rmse" << rmse;
   fs.release();

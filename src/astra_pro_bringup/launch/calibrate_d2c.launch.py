@@ -1,9 +1,22 @@
+# Copyright 2026 BandieraRossa
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes, Node, PushRosNamespace
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 
@@ -42,17 +55,30 @@ def generate_launch_description():
         ),
     ]
 
-    # Camera stack (orbbec + v4l2 + flip relay + static TF).
-    cameras = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution([bringup_share, 'launch', 'astra_pro.launch.py'])
-        ),
-        launch_arguments={
+    camera_params = [
+        PathJoinSubstitution([bringup_share, 'config', 'astra_pro_params.yaml']),
+        {
             'camera_name': LaunchConfiguration('camera_name'),
             'ir_info_url': LaunchConfiguration('ir_info_url'),
-            'color_info_url': LaunchConfiguration('color_info_url'),
-        }.items(),
-        condition=IfCondition(LaunchConfiguration('with_cameras')),
+        },
+    ]
+    orbbec = ComposableNode(
+        package='orbbec_camera', plugin='orbbec_camera::OBCameraNodeDriver',
+        name='orbbec', namespace='', parameters=camera_params,
+        extra_arguments=[{'use_intra_process_comms': True}],
+    )
+    v4l2 = ComposableNode(
+        package='v4l2_camera', plugin='v4l2_camera::V4L2Camera',
+        name='v4l2_camera_node', namespace='color',
+        parameters=[
+            PathJoinSubstitution([bringup_share, 'config', 'astra_pro_params.yaml']),
+            {'camera_info_url': LaunchConfiguration('color_info_url')},
+        ],
+        extra_arguments=[{'use_intra_process_comms': True}],
+    )
+    flip = ComposableNode(
+        package='image_flip', plugin='ImageFlip', name='flip_node', namespace='color',
+        extra_arguments=[{'use_intra_process_comms': True}],
     )
 
     # mono16 -> mono8 for the calibrator (normalize: brighter, better contrast)
@@ -94,5 +120,25 @@ def generate_launch_description():
         composable_node_descriptions=[converter, capture],
         output='screen',
     )
+    camera_nodes = LoadComposableNodes(
+        target_container=container,
+        composable_node_descriptions=[orbbec, v4l2, flip],
+        condition=IfCondition(LaunchConfiguration('with_cameras')),
+    )
 
-    return LaunchDescription(args + [cameras, container])
+    color_optical_tf = Node(
+        package='tf2_ros', executable='static_transform_publisher',
+        name='color_optical_static_tf',
+        arguments=['0', '0', '0', '0', '0', '0',
+                   'camera_depth_optical_frame', 'camera_color_optical_frame'],
+        output='screen',
+    )
+    return LaunchDescription([
+        *args,
+        GroupAction([
+            PushRosNamespace(LaunchConfiguration('camera_name')),
+            container,
+            camera_nodes,
+        ]),
+        color_optical_tf,
+    ])
